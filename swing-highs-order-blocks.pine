@@ -41,6 +41,8 @@ f_parseTimeString(timeStr) =>
     minStr = array.get(parts, 1)
     hour = str.tonumber(hourStr)
     minute = str.tonumber(minStr)
+    hour := na(hour) ? 0 : hour
+    minute := na(minute) ? 0 : minute
     [hour, minute]
 
 f_timeInRange(sessionStart, sessionEnd) =>
@@ -172,6 +174,7 @@ maxFVGZones = input.int(20, "Max FVG/IFVG Zones", minval=1, group=group_fvg)
 
 var array<box> fvgBoxes = array.new<box>()
 var array<bool> isIFVG = array.new<bool>()
+var array<bool> fvgActive = array.new<bool>()
 
 f_isBullishFVG() =>
     low[2] > high[1]
@@ -195,10 +198,11 @@ if showFVG
             gapBox = box.new(bar_index[2], high[1], bar_index[1], low[2], border_color=bullishFVGColor, bgcolor=bullishFVGColor)
             array.push(fvgBoxes, gapBox)
             array.push(isIFVG, false)
+            array.push(fvgActive, true)
             if array.size(fvgBoxes) > maxFVGZones
-                oldBox = array.shift(fvgBoxes)
-                box.set_deleted(oldBox, true)
+                array.shift(fvgBoxes)
                 array.shift(isIFVG)
+                array.shift(fvgActive)
     
     if f_isBearishFVG()
         gapSize = low[1] - high[2]
@@ -206,30 +210,33 @@ if showFVG
             gapBox = box.new(bar_index[2], high[2], bar_index[1], low[1], border_color=bearishFVGColor, bgcolor=bearishFVGColor)
             array.push(fvgBoxes, gapBox)
             array.push(isIFVG, false)
+            array.push(fvgActive, true)
             if array.size(fvgBoxes) > maxFVGZones
-                oldBox = array.shift(fvgBoxes)
-                box.set_deleted(oldBox, true)
+                array.shift(fvgBoxes)
                 array.shift(isIFVG)
+                array.shift(fvgActive)
 
 if showIFVG and array.size(fvgBoxes) > 0
     for i = 0 to array.size(fvgBoxes) - 1
-        fvgBox = array.get(fvgBoxes, i)
-        isFVG = not array.get(isIFVG, i)
-        
-        if isFVG
-            boxTop = box.get_top(fvgBox)
-            boxBot = box.get_bottom(fvgBox)
+        if i < array.size(fvgActive)
+            fvgBox = array.get(fvgBoxes, i)
+            isFVG = not array.get(isIFVG, i)
+            isActive = array.get(fvgActive, i)
             
-            if boxTop > boxBot
-                if close < boxBot
-                    array.set(isIFVG, i, true)
-                    box.set_bgcolor(fvgBox, bullishIFVGColor)
-                    box.set_border_color(fvgBox, bullishIFVGColor)
-            else
-                if close > boxTop
-                    array.set(isIFVG, i, true)
-                    box.set_bgcolor(fvgBox, bearishIFVGColor)
-                    box.set_border_color(fvgBox, bearishIFVGColor)
+            if isActive and isFVG
+                boxTop = box.get_top(fvgBox)
+                boxBot = box.get_bottom(fvgBox)
+                
+                if boxTop > boxBot
+                    if close < boxBot
+                        array.set(isIFVG, i, true)
+                        box.set_bgcolor(fvgBox, bullishIFVGColor)
+                        box.set_border_color(fvgBox, bullishIFVGColor)
+                else
+                    if close > boxTop
+                        array.set(isIFVG, i, true)
+                        box.set_bgcolor(fvgBox, bearishIFVGColor)
+                        box.set_border_color(fvgBox, bearishIFVGColor)
 
 // ============================================
 // MODULE 4: ORDER BLOCKS
@@ -264,8 +271,7 @@ if showOB
         array.push(obMitigated, false)
         array.push(obType, "bullish")
         if array.size(obBoxes) > maxOBCount
-            oldBox = array.shift(obBoxes)
-            box.set_deleted(oldBox, true)
+            array.shift(obBoxes)
             array.shift(obMitigated)
             array.shift(obType)
     
@@ -275,45 +281,45 @@ if showOB
         array.push(obMitigated, false)
         array.push(obType, "bearish")
         if array.size(obBoxes) > maxOBCount
-            oldBox = array.shift(obBoxes)
-            box.set_deleted(oldBox, true)
+            array.shift(obBoxes)
             array.shift(obMitigated)
             array.shift(obType)
 
 if showOB and array.size(obBoxes) > 0
     for i = 0 to array.size(obBoxes) - 1
-        obBox = array.get(obBoxes, i)
-        isMit = array.get(obMitigated, i)
-        obT = array.get(obType, i)
-        
-        if not isMit
-            boxTop = box.get_top(obBox)
-            boxBot = box.get_bottom(obBox)
+        if i < array.size(obMitigated)
+            obBox = array.get(obBoxes, i)
+            isMit = array.get(obMitigated, i)
+            obT = array.get(obType, i)
             
-            if obT == "bullish"
-                if obMitigation == "close"
-                    if close > boxTop
-                        array.set(obMitigated, i, true)
-                        box.set_border_color(obBox, color.gray)
-                        box.set_bgcolor(obBox, color.new(color.gray, 85))
+            if not isMit
+                boxTop = box.get_top(obBox)
+                boxBot = box.get_bottom(obBox)
+                
+                if obT == "bullish"
+                    if obMitigation == "close"
+                        if close > boxTop
+                            array.set(obMitigated, i, true)
+                            box.set_border_color(obBox, color.gray)
+                            box.set_bgcolor(obBox, color.new(color.gray, 85))
+                    else
+                        if high > boxTop
+                            array.set(obMitigated, i, true)
+                            box.set_border_color(obBox, color.gray)
+                            box.set_bgcolor(obBox, color.new(color.gray, 85))
                 else
-                    if high > boxTop
-                        array.set(obMitigated, i, true)
-                        box.set_border_color(obBox, color.gray)
-                        box.set_bgcolor(obBox, color.new(color.gray, 85))
-            else
-                if obMitigation == "close"
-                    if close < boxBot
-                        array.set(obMitigated, i, true)
-                        box.set_border_color(obBox, color.gray)
-                        box.set_bgcolor(obBox, color.new(color.gray, 85))
-                else
-                    if low < boxBot
-                        array.set(obMitigated, i, true)
-                        box.set_border_color(obBox, color.gray)
-                        box.set_bgcolor(obBox, color.new(color.gray, 85))
-            
-            box.set_right(obBox, bar_index)
+                    if obMitigation == "close"
+                        if close < boxBot
+                            array.set(obMitigated, i, true)
+                            box.set_border_color(obBox, color.gray)
+                            box.set_bgcolor(obBox, color.new(color.gray, 85))
+                    else
+                        if low < boxBot
+                            array.set(obMitigated, i, true)
+                            box.set_border_color(obBox, color.gray)
+                            box.set_bgcolor(obBox, color.new(color.gray, 85))
+                
+                box.set_right(obBox, bar_index)
 
 // ============================================
 // ALERTS
@@ -326,16 +332,19 @@ alertIFVG = input.bool(true, "Alert on IFVG", group=group_alerts)
 alertOB = input.bool(true, "Alert on OB", group=group_alerts)
 
 if alertFVG and array.size(fvgBoxes) > 0
-    lastFVG = not array.get(isIFVG, array.size(isIFVG) - 1)
-    if lastFVG
-        alert("New FVG Detected!", alert.freq_once_per_bar)
+    if array.size(isIFVG) > 0
+        lastFVG = not array.get(isIFVG, array.size(isIFVG) - 1)
+        if lastFVG
+            alert("New FVG Detected!", alert.freq_once_per_bar)
 
 if alertIFVG and array.size(fvgBoxes) > 0
-    lastIFVG = array.get(isIFVG, array.size(isIFVG) - 1)
-    if lastIFVG
-        alert("IFVG Converted!", alert.freq_once_per_bar)
+    if array.size(isIFVG) > 0
+        lastIFVG = array.get(isIFVG, array.size(isIFVG) - 1)
+        if lastIFVG
+            alert("IFVG Converted!", alert.freq_once_per_bar)
 
 if alertOB and array.size(obBoxes) > 0
-    lastOB = not array.get(obMitigated, array.size(obMitigated) - 1)
-    if lastOB
-        alert("New Order Block!", alert.freq_once_per_bar)
+    if array.size(obMitigated) > 0
+        lastOB = not array.get(obMitigated, array.size(obMitigated) - 1)
+        if lastOB
+            alert("New Order Block!", alert.freq_once_per_bar)
