@@ -28,7 +28,7 @@ oteColor = input.color(color.green, "OTE Color")
 isSwingHigh = high[swingLength] == ta.highest(high, swingLength * 2 + 1)
 
 if isSwingHigh
-    plotshape(isSwingHigh, location=location.abovebar, shape=shape.diamond, color=swingHighColor, size=size.small)
+    plotshape(isSwingHigh, style=shape.diamond, location=location.abovebar, color=swingHighColor, size=size.small)
 
 // ============================================
 // ORDER BLOCK DETECTION
@@ -70,7 +70,7 @@ if showOTE
     bearishOTE = high >= swingHigh * 0.998 and close < open
     
     if bullishOTE
-        plotshape(bullishOTE, location=location.belowbar, shape=shape.triangle, color=oteColor, size=size.small)
+        plotshape(bullishOTE, style=shape.triangle, location=location.belowbar, color=oteColor, size=size.small)
     
     if bearishOTE
-        plotshape(bearishOTE, location=location.abovebar, shape=shape.triangle, color=oteColor, size=size.small)
+        plotshape(bearishOTE, style=shape.triangle, location=location.abovebar, color=oteColor, size=size.small)
