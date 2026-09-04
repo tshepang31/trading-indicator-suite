@@ -1,0 +1,112 @@
+//@version=5
+indicator("Swing Highs + Order Blocks + IFVG + OTE", overlay=true, max_lines_count=500, max_boxes_count=500)
+
+// ============================================
+// INPUT SETTINGS
+// ============================================
+
+// Swing Settings
+swingLength = input.int(5, "Swing Length", minval=1, group="SWING HIGHS")
+swingHighColor = input.color(color.new(color.red, 0), "Swing High Color", group="SWING HIGHS")
+swingHighSize = input.string("small", "Marker Size", options=["small", "medium", "large"], group="SWING HIGHS")
+
+// Order Block Settings
+obLength = input.int(5, "Order Block Length", minval=1, group="ORDER BLOCKS")
+obColor = input.color(color.new(color.blue, 80), "Order Block Color", group="ORDER BLOCKS")
+showOrderBlocks = input.bool(true, "Show Order Blocks", group="ORDER BLOCKS")
+
+// IFVG Settings
+ifvgLength = input.int(2, "IFVG Lookback", minval=1, group="IFVG")
+ifvgColor = input.color(color.new(color.orange, 85), "IFVG Color", group="IFVG")
+showIFVG = input.bool(true, "Show IFVG", group="IFVG")
+
+// OTE Settings
+oteLength = input.int(5, "OTE Lookback", minval=1, group="OTE")
+oteColor = input.color(color.new(color.green, 80), "OTE Color", group="OTE")
+showOTE = input.bool(true, "Show OTE", group="OTE")
+
+// ============================================
+// SWING HIGH DETECTION
+// ============================================
+
+isSwingHigh = false
+if ta.highest(high, swingLength) == high[swingLength/2]
+    isSwingHigh := true
+
+// Draw Swing Highs
+if isSwingHigh
+    size = swingHighSize == "large" ? size.large : (swingHighSize == "medium" ? size.medium : size.small)
+    plotshape(isSwingHigh, location=location.abovebar, shape=shape.diamond, color=swingHighColor, size=size, title="Swing High")
+
+// ============================================
+// ORDER BLOCK DETECTION
+// ============================================
+
+if showOrderBlocks
+    // Order Block: Previous candle's high/low when price breaks structure
+    bullishOB = close > open and low < low[1] and high > high[1]
+    bearishOB = close < open and high > high[1] and low < low[1]
+    
+    if bullishOB
+        box.new(bar_index[1], high[1], bar_index, low[1], border_color=obColor, bgcolor=obColor, title="Bullish OB")
+    
+    if bearishOB
+        box.new(bar_index[1], high[1], bar_index, low[1], border_color=obColor, bgcolor=obColor, title="Bearish OB")
+
+// ============================================
+// IFVG DETECTION (Inefficiency Fill Volume Gap)
+// ============================================
+
+if showIFVG
+    // IFVG: Gap between body candles (3-candle pattern)
+    ifvgExists = false
+    ifvgHigh = 0.0
+    ifvgLow = 0.0
+    
+    // Bullish IFVG: Low of candle 1 > High of candle 2
+    if low[2] > high[1]
+        ifvgExists := true
+        ifvgHigh := low[2]
+        ifvgLow := high[1]
+    
+    // Bearish IFVG: High of candle 1 < Low of candle 2
+    if high[2] < low[1]
+        ifvgExists := true
+        ifvgHigh := low[1]
+        ifvgLow := high[2]
+    
+    if ifvgExists
+        box.new(bar_index[2], ifvgHigh, bar_index, ifvgLow, border_color=ifvgColor, bgcolor=ifvgColor, title="IFVG")
+
+// ============================================
+// OTE DETECTION (Order Template Entry)
+// ============================================
+
+if showOTE
+    // OTE: When price retests a swing low/high with confluence
+    swingLow = ta.lowest(low, oteLength)
+    swingHigh = ta.highest(high, oteLength)
+    
+    // Bullish OTE: Price near swing low with higher high
+    bullishOTE = low <= swingLow * 1.001 and high > high[1]
+    
+    // Bearish OTE: Price near swing high with lower low
+    bearishOTE = high >= swingHigh * 0.999 and low < low[1]
+    
+    if bullishOTE
+        plotshape(bullishOTE, location=location.belowbar, shape=shape.triangle, color=oteColor, size=size.small, title="Bullish OTE")
+    
+    if bearishOTE
+        plotshape(bearishOTE, location=location.abovebar, shape=shape.triangle, color=oteColor, size=size.small, title="Bearish OTE")
+
+// ============================================
+// ALERTS
+// ============================================
+
+alertSwingHigh = ta.change(isSwingHigh) and isSwingHigh
+alertOrderBlock = false
+alertIFVG = false
+alertOTE = false
+
+if alertSwingHigh
+    alert("Swing High Detected!", alert.freq_once_per_bar_close)
