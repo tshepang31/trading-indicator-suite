@@ -1,11 +1,145 @@
-//@version=5
-indicator("Simple Trading Indicator", overlay=true)
+//@version=6
+indicator("ICT Sessions + IFVG + Order Blocks + OTE", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
 
-// Simple Swing High
-length = input.int(5, "Length")
-color1 = input.color(color.red, "Color")
+// ============================================
+// MODULE 1: TRADING SESSIONS
+// ============================================
 
-highestHigh = ta.highest(high, length)
-isHigh = high == highestHigh
+// Session Settings
+group_sessions = "SESSION SETTINGS"
 
-plotshape(isHigh, style=shape.diamond, location=location.abovebar, color=color1)
+asiaEnabled = input.bool(true, "Asia ON/OFF", group=group_sessions)
+asiaStart = input.string("00:00", "Asia Start Time", group=group_sessions)
+asiaEnd = input.string("09:00", "Asia End Time", group=group_sessions)
+asiaColor = input.color(color.new(color.blue, 80), "Asia Color", group=group_sessions)
+
+londonEnabled = input.bool(true, "London ON/OFF", group=group_sessions)
+londonStart = input.string("08:00", "London Start Time", group=group_sessions)
+londonEnd = input.string("17:00", "London End Time", group=group_sessions)
+londonColor = input.color(color.new(color.orange, 80), "London Color", group=group_sessions)
+
+nyEnabled = input.bool(true, "New York ON/OFF", group=group_sessions)
+nyStart = input.string("13:00", "NY Start Time", group=group_sessions)
+nyEnd = input.string("22:00", "NY End Time", group=group_sessions)
+nyColor = input.color(color.new(color.red, 80), "NY Color", group=group_sessions)
+
+sessionTimeZone = input.string("UTC", "Timezone", options=["UTC", "GMT+1", "GMT+2", "EST", "CST", "PST"], group=group_sessions)
+
+// ============================================
+// SESSION TRACKING VARIABLES
+// ============================================
+
+var array<line> asiaHighLines = array.new<line>()
+var array<line> asiaLowLines = array.new<line>()
+var array<line> londonHighLines = array.new<line>()
+var array<line> londonLowLines = array.new<line>()
+var array<line> nyHighLines = array.new<line>()
+var array<line> nyLowLines = array.new<line>()
+
+var array<label> asiaLabels = array.new<label>()
+var array<label> londonLabels = array.new<label>()
+var array<label> nyLabels = array.new<label>()
+
+var float asiaSessionHigh = na
+var float asiaSessionLow = na
+var float londonSessionHigh = na
+var float londonSessionLow = na
+var float nySessionHigh = na
+var float nySessionLow = na
+
+var string lastAsiaSession = ""
+var string lastLondonSession = ""
+var string lastNySession = ""
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+f_timeInRange(timeStr, sessionStart, sessionEnd) =>
+    currentTime = time(timeframe.period, sessionTimeZone)
+    currentHour = hour(currentTime)
+    currentMin = minute(currentTime)
+    currentMinutes = currentHour * 60 + currentMin
+    
+    startParts = str.split(sessionStart, ":")
+    startHour = int(array.get(startParts, 0))
+    startMin = int(array.get(startParts, 1))
+    startMinutes = startHour * 60 + startMin
+    
+    endParts = str.split(sessionEnd, ":")
+    endHour = int(array.get(endParts, 0))
+    endMin = int(array.get(endParts, 1))
+    endMinutes = endHour * 60 + endMin
+    
+    if startMinutes <= endMinutes
+        currentMinutes >= startMinutes and currentMinutes < endMinutes
+    else
+        currentMinutes >= startMinutes or currentMinutes < endMinutes
+
+f_drawSessionLine(high, low, color, isHigh, sessionName) =>
+    if not na(high) and not na(low)
+        lineHigh = line.new(bar_index - 1, high, bar_index, high, color=color, width=2)
+        lineLow = line.new(bar_index - 1, low, bar_index, low, color=color, width=2)
+        
+        label.new(bar_index, high, sessionName + " H", color=color, textcolor=color.white, size=size.small, style=label.style_label_lower)
+        label.new(bar_index, low, sessionName + " L", color=color, textcolor=color.white, size=size.small, style=label.style_label_upper)
+
+// ============================================
+// ASIA SESSION
+// ============================================
+
+if asiaEnabled
+    isAsiaSession = f_timeInRange(time, asiaStart, asiaEnd)
+    currentAsiaSession = str.format("{0}-{1}", year, dayofweek)
+    
+    if isAsiaSession
+        if currentAsiaSession != lastAsiaSession
+            asiaSessionHigh := high
+            asiaSessionLow := low
+            lastAsiaSession := currentAsiaSession
+        else
+            asiaSessionHigh := math.max(asiaSessionHigh, high)
+            asiaSessionLow := math.min(asiaSessionLow, low)
+    
+    if not na(asiaSessionHigh) and not na(asiaSessionLow)
+        f_drawSessionLine(asiaSessionHigh, asiaSessionLow, asiaColor, true, "Asia")
+
+// ============================================
+// LONDON SESSION
+// ============================================
+
+if londonEnabled
+    isLondonSession = f_timeInRange(time, londonStart, londonEnd)
+    currentLondonSession = str.format("{0}-{1}", year, dayofweek)
+    
+    if isLondonSession
+        if currentLondonSession != lastLondonSession
+            londonSessionHigh := high
+            londonSessionLow := low
+            lastLondonSession := currentLondonSession
+        else
+            londonSessionHigh := math.max(londonSessionHigh, high)
+            londonSessionLow := math.min(londonSessionLow, low)
+    
+    if not na(londonSessionHigh) and not na(londonSessionLow)
+        f_drawSessionLine(londonSessionHigh, londonSessionLow, londonColor, true, "London")
+
+// ============================================
+// NEW YORK SESSION
+// ============================================
+
+if nyEnabled
+    isNySession = f_timeInRange(time, nyStart, nyEnd)
+    currentNySession = str.format("{0}-{1}", year, dayofweek)
+    
+    if isNySession
+        if currentNySession != lastNySession
+            nySessionHigh := high
+            nySessionLow := low
+            lastNySession := currentNySession
+        else
+            nySessionHigh := math.max(nySessionHigh, high)
+            nySessionLow := math.min(nySessionLow, low)
+    
+    if not na(nySessionHigh) and not na(nySessionLow)
+        f_drawSessionLine(nySessionHigh, nySessionLow, nyColor, true, "NY")
