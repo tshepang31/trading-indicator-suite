@@ -55,7 +55,7 @@ var string lastNySession = ""
 // HELPER FUNCTIONS
 // ============================================
 
-f_timeInRange(timeStr, sessionStart, sessionEnd) =>
+f_timeInRange(sessionStart, sessionEnd) =>
     currentTime = time(timeframe.period, sessionTimeZone)
     currentHour = hour(currentTime)
     currentMin = minute(currentTime)
@@ -76,20 +76,20 @@ f_timeInRange(timeStr, sessionStart, sessionEnd) =>
     else
         currentMinutes >= startMinutes or currentMinutes < endMinutes
 
-f_drawSessionLine(high, low, color, isHigh, sessionName) =>
-    if not na(high) and not na(low)
-        lineHigh = line.new(bar_index - 1, high, bar_index, high, color=color, width=2)
-        lineLow = line.new(bar_index - 1, low, bar_index, low, color=color, width=2)
+f_drawSessionLine(sessionHigh, sessionLow, sessionColor, sessionName) =>
+    if not na(sessionHigh) and not na(sessionLow)
+        line.new(bar_index - 1, sessionHigh, bar_index, sessionHigh, color=sessionColor, width=2)
+        line.new(bar_index - 1, sessionLow, bar_index, sessionLow, color=sessionColor, width=2)
         
-        label.new(bar_index, high, sessionName + " H", color=color, textcolor=color.white, size=size.small, style=label.style_label_lower)
-        label.new(bar_index, low, sessionName + " L", color=color, textcolor=color.white, size=size.small, style=label.style_label_upper)
+        label.new(bar_index, sessionHigh, sessionName + " H", color=sessionColor, textcolor=color.white, size=size.small, style=label.style_label_center)
+        label.new(bar_index, sessionLow, sessionName + " L", color=sessionColor, textcolor=color.white, size=size.small, style=label.style_label_center)
 
 // ============================================
 // ASIA SESSION
 // ============================================
 
 if asiaEnabled
-    isAsiaSession = f_timeInRange(time, asiaStart, asiaEnd)
+    isAsiaSession = f_timeInRange(asiaStart, asiaEnd)
     currentAsiaSession = str.format("{0}-{1}", year, dayofweek)
     
     if isAsiaSession
@@ -102,14 +102,14 @@ if asiaEnabled
             asiaSessionLow := math.min(asiaSessionLow, low)
     
     if not na(asiaSessionHigh) and not na(asiaSessionLow)
-        f_drawSessionLine(asiaSessionHigh, asiaSessionLow, asiaColor, true, "Asia")
+        f_drawSessionLine(asiaSessionHigh, asiaSessionLow, asiaColor, "Asia")
 
 // ============================================
 // LONDON SESSION
 // ============================================
 
 if londonEnabled
-    isLondonSession = f_timeInRange(time, londonStart, londonEnd)
+    isLondonSession = f_timeInRange(londonStart, londonEnd)
     currentLondonSession = str.format("{0}-{1}", year, dayofweek)
     
     if isLondonSession
@@ -122,14 +122,14 @@ if londonEnabled
             londonSessionLow := math.min(londonSessionLow, low)
     
     if not na(londonSessionHigh) and not na(londonSessionLow)
-        f_drawSessionLine(londonSessionHigh, londonSessionLow, londonColor, true, "London")
+        f_drawSessionLine(londonSessionHigh, londonSessionLow, londonColor, "London")
 
 // ============================================
 // NEW YORK SESSION
 // ============================================
 
 if nyEnabled
-    isNySession = f_timeInRange(time, nyStart, nyEnd)
+    isNySession = f_timeInRange(nyStart, nyEnd)
     currentNySession = str.format("{0}-{1}", year, dayofweek)
     
     if isNySession
@@ -142,4 +142,4 @@ if nyEnabled
             nySessionLow := math.min(nySessionLow, low)
     
     if not na(nySessionHigh) and not na(nySessionLow)
-        f_drawSessionLine(nySessionHigh, nySessionLow, nyColor, true, "NY")
+        f_drawSessionLine(nySessionHigh, nySessionLow, nyColor, "NY")
