@@ -1,77 +1,51 @@
 //@version=5
 indicator("Swing Highs + Order Blocks + IFVG + OTE", overlay=true)
 
-// INPUT SETTINGS
 swingLength = input.int(5, "Swing Length", minval=1)
 swingHighColor = input.color(color.red, "Swing High Color")
-
 showOrderBlocks = input.bool(true, "Show Order Blocks")
 obColor = input.color(color.blue, "Order Block Color")
-
 showIFVG = input.bool(true, "Show IFVG")
 ifvgColor = input.color(color.orange, "IFVG Color")
-
 showOTE = input.bool(true, "Show OTE")
 oteColor = input.color(color.green, "OTE Color")
 
-// SWING HIGH DETECTION
-isSwingHigh = high[swingLength] == ta.highest(high, swingLength * 2 + 1)
+// Swing High Detection
+midpoint = math.round(swingLength / 2)
+isSwingHigh = high[midpoint] == ta.highest(high, swingLength)
 
 if isSwingHigh
-    plotshape(isSwingHigh, 
-        style=shape.diamond, 
-        location=location.abovebar, 
-        color=swingHighColor, 
-        size=size.small)
+    plotshape(true, style=shape.diamond, location=location.abovebar, color=swingHighColor, size=size.small)
 
-// ORDER BLOCK DETECTION
+// Order Block Detection
 if showOrderBlocks
     bullishOB = close[1] > open[1] and close < low[1]
-    bearishOB = close[1] < open[1] and close > high[1]
-    
     if bullishOB
-        box.new(bar_index[1], high[1], bar_index, low[1], 
-            border_color=obColor, 
-            bgcolor=color.new(obColor, 80))
+        box.new(bar_index[1], high[1], bar_index, low[1], border_color=obColor, bgcolor=color.new(obColor, 80))
     
+    bearishOB = close[1] < open[1] and close > high[1]
     if bearishOB
-        box.new(bar_index[1], high[1], bar_index, low[1], 
-            border_color=obColor, 
-            bgcolor=color.new(obColor, 80))
+        box.new(bar_index[1], high[1], bar_index, low[1], border_color=obColor, bgcolor=color.new(obColor, 80))
 
-// IFVG DETECTION
+// IFVG Detection
 if showIFVG
     bullishGap = low[2] > high[1]
-    bearishGap = high[2] < low[1]
-    
     if bullishGap
-        box.new(bar_index[2], low[2], bar_index[1], high[1], 
-            border_color=ifvgColor, 
-            bgcolor=color.new(ifvgColor, 80))
+        box.new(bar_index[2], low[2], bar_index[1], high[1], border_color=ifvgColor, bgcolor=color.new(ifvgColor, 80))
     
+    bearishGap = high[2] < low[1]
     if bearishGap
-        box.new(bar_index[2], high[2], bar_index[1], low[1], 
-            border_color=ifvgColor, 
-            bgcolor=color.new(ifvgColor, 80))
+        box.new(bar_index[2], high[2], bar_index[1], low[1], border_color=ifvgColor, bgcolor=color.new(ifvgColor, 80))
 
-// OTE DETECTION
+// OTE Detection
 if showOTE
     swingLow = ta.lowest(low, 5)
     swingHigh = ta.highest(high, 5)
     
     bullishOTE = low <= swingLow * 1.002 and close > open
-    bearishOTE = high >= swingHigh * 0.998 and close < open
-    
     if bullishOTE
-        plotshape(bullishOTE, 
-            style=shape.triangle, 
-            location=location.belowbar, 
-            color=oteColor, 
-            size=size.small)
+        plotshape(true, style=shape.triangle, location=location.belowbar, color=oteColor, size=size.small)
     
+    bearishOTE = high >= swingHigh * 0.998 and close < open
     if bearishOTE
-        plotshape(bearishOTE, 
-            style=shape.triangle, 
-            location=location.abovebar, 
-            color=oteColor, 
-            size=size.small)
+        plotshape(true, style=shape.triangle, location=location.abovebar, color=oteColor, size=size.small)
