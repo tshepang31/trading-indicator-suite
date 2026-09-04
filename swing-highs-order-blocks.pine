@@ -5,7 +5,6 @@ indicator("ICT Sessions + IFVG + Order Blocks + OTE", overlay=true, max_boxes_co
 // MODULE 1: TRADING SESSIONS
 // ============================================
 
-// Session Settings
 group_sessions = "SESSION SETTINGS"
 
 asiaEnabled = input.bool(true, "Asia ON/OFF", group=group_sessions)
@@ -25,10 +24,6 @@ nyColor = input.color(color.new(color.red, 80), "NY Color", group=group_sessions
 
 sessionTimeZone = input.string("UTC", "Timezone", options=["UTC", "GMT+1", "GMT+2", "EST", "CST", "PST"], group=group_sessions)
 
-// ============================================
-// SESSION TRACKING VARIABLES
-// ============================================
-
 var float asiaSessionHigh = na
 var float asiaSessionLow = na
 var float londonSessionHigh = na
@@ -39,10 +34,6 @@ var float nySessionLow = na
 var string lastAsiaSession = ""
 var string lastLondonSession = ""
 var string lastNySession = ""
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
 
 f_parseTimeString(timeStr) =>
     parts = str.split(timeStr, ":")
@@ -77,10 +68,6 @@ f_drawSessionLine(sessionHigh, sessionLow, sessionColor, sessionName) =>
         label.new(bar_index, sessionHigh, sessionName + " H", color=sessionColor, textcolor=color.white, size=size.small, style=label.style_label_center)
         label.new(bar_index, sessionLow, sessionName + " L", color=sessionColor, textcolor=color.white, size=size.small, style=label.style_label_center)
 
-// ============================================
-// ASIA SESSION
-// ============================================
-
 if asiaEnabled
     isAsiaSession = f_timeInRange(asiaStart, asiaEnd)
     currentAsiaSession = str.format("{0}-{1}", year, dayofweek)
@@ -96,10 +83,6 @@ if asiaEnabled
     
     if not na(asiaSessionHigh) and not na(asiaSessionLow)
         f_drawSessionLine(asiaSessionHigh, asiaSessionLow, asiaColor, "Asia")
-
-// ============================================
-// LONDON SESSION
-// ============================================
 
 if londonEnabled
     isLondonSession = f_timeInRange(londonStart, londonEnd)
@@ -117,10 +100,6 @@ if londonEnabled
     if not na(londonSessionHigh) and not na(londonSessionLow)
         f_drawSessionLine(londonSessionHigh, londonSessionLow, londonColor, "London")
 
-// ============================================
-// NEW YORK SESSION
-// ============================================
-
 if nyEnabled
     isNySession = f_timeInRange(nyStart, nyEnd)
     currentNySession = str.format("{0}-{1}", year, dayofweek)
@@ -136,3 +115,227 @@ if nyEnabled
     
     if not na(nySessionHigh) and not na(nySessionLow)
         f_drawSessionLine(nySessionHigh, nySessionLow, nyColor, "NY")
+
+// ============================================
+// MODULE 2: MARKET STRUCTURE
+// ============================================
+
+group_structure = "MARKET STRUCTURE"
+
+swingLength = input.int(5, "Swing Length", minval=1, group=group_structure)
+showStructure = input.bool(true, "Show Structure", group=group_structure)
+showBOSLabels = input.bool(true, "Show BOS Labels", group=group_structure)
+
+var array<int> swingHighBars = array.new<int>()
+var array<float> swingHighPrices = array.new<float>()
+var array<int> swingLowBars = array.new<int>()
+var array<float> swingLowPrices = array.new<float>()
+
+f_isSwingHigh(index) =>
+    high[index] == ta.highest(high, swingLength * 2 + 1)
+
+f_isSwingLow(index) =>
+    low[index] == ta.lowest(low, swingLength * 2 + 1)
+
+if showStructure
+    if f_isSwingHigh(swingLength)
+        array.push(swingHighBars, bar_index[swingLength])
+        array.push(swingHighPrices, high[swingLength])
+        if array.size(swingHighBars) > 100
+            array.shift(swingHighBars)
+            array.shift(swingHighPrices)
+    
+    if f_isSwingLow(swingLength)
+        array.push(swingLowBars, bar_index[swingLength])
+        array.push(swingLowPrices, low[swingLength])
+        if array.size(swingLowBars) > 100
+            array.shift(swingLowBars)
+            array.shift(swingLowPrices)
+
+// ============================================
+// MODULE 3: FAIR VALUE GAPS & IFVG
+// ============================================
+
+group_fvg = "FVG / IFVG SETTINGS"
+
+showFVG = input.bool(true, "FVG ON/OFF", group=group_fvg)
+showIFVG = input.bool(true, "IFVG ON/OFF", group=group_fvg)
+minGapSize = input.float(0.0, "Minimum Gap Size (pips)", minval=0.0, group=group_fvg)
+useATRFilter = input.bool(false, "Use ATR Filter", group=group_fvg)
+atrPeriod = input.int(14, "ATR Period", minval=1, group=group_fvg)
+atrMultiplier = input.float(1.0, "ATR Multiplier", minval=0.1, group=group_fvg)
+bullishFVGColor = input.color(color.new(color.green, 80), "Bullish FVG Color", group=group_fvg)
+bearishFVGColor = input.color(color.new(color.red, 80), "Bearish FVG Color", group=group_fvg)
+bullishIFVGColor = input.color(color.new(color.blue, 80), "Bullish IFVG Color", group=group_fvg)
+bearishIFVGColor = input.color(color.new(color.orange, 80), "Bearish IFVG Color", group=group_fvg)
+maxFVGZones = input.int(20, "Max FVG/IFVG Zones", minval=1, group=group_fvg)
+
+var array<box> fvgBoxes = array.new<box>()
+var array<bool> isIFVG = array.new<bool>()
+
+f_isBullishFVG() =>
+    low[2] > high[1]
+
+f_isBearishFVG() =>
+    high[2] < low[1]
+
+f_getGapSize() =>
+    atrVal = ta.atr(atrPeriod)
+    if useATRFilter
+        atrVal * atrMultiplier
+    else
+        minGapSize
+
+if showFVG
+    currentGapSize = f_getGapSize()
+    
+    if f_isBullishFVG()
+        gapSize = low[2] - high[1]
+        if gapSize >= currentGapSize
+            gapBox = box.new(bar_index[2], high[1], bar_index[1], low[2], border_color=bullishFVGColor, bgcolor=bullishFVGColor)
+            array.push(fvgBoxes, gapBox)
+            array.push(isIFVG, false)
+            if array.size(fvgBoxes) > maxFVGZones
+                oldBox = array.shift(fvgBoxes)
+                box.set_deleted(oldBox, true)
+                array.shift(isIFVG)
+    
+    if f_isBearishFVG()
+        gapSize = low[1] - high[2]
+        if gapSize >= currentGapSize
+            gapBox = box.new(bar_index[2], high[2], bar_index[1], low[1], border_color=bearishFVGColor, bgcolor=bearishFVGColor)
+            array.push(fvgBoxes, gapBox)
+            array.push(isIFVG, false)
+            if array.size(fvgBoxes) > maxFVGZones
+                oldBox = array.shift(fvgBoxes)
+                box.set_deleted(oldBox, true)
+                array.shift(isIFVG)
+
+if showIFVG and array.size(fvgBoxes) > 0
+    for i = 0 to array.size(fvgBoxes) - 1
+        fvgBox = array.get(fvgBoxes, i)
+        isFVG = not array.get(isIFVG, i)
+        
+        if isFVG
+            boxTop = box.get_top(fvgBox)
+            boxBot = box.get_bottom(fvgBox)
+            
+            if boxTop > boxBot
+                if close < boxBot
+                    array.set(isIFVG, i, true)
+                    box.set_bgcolor(fvgBox, bullishIFVGColor)
+                    box.set_border_color(fvgBox, bullishIFVGColor)
+            else
+                if close > boxTop
+                    array.set(isIFVG, i, true)
+                    box.set_bgcolor(fvgBox, bearishIFVGColor)
+                    box.set_border_color(fvgBox, bearishIFVGColor)
+
+// ============================================
+// MODULE 4: ORDER BLOCKS
+// ============================================
+
+group_ob = "ORDER BLOCK SETTINGS"
+
+showOB = input.bool(true, "OB ON/OFF", group=group_ob)
+obDisplacement = input.float(1.0, "Displacement Sensitivity (ATR)", minval=0.1, group=group_ob)
+obMitigation = input.string("close", "Mitigation Method", options=["close", "wick"], group=group_ob)
+bullishOBColor = input.color(color.new(color.green, 85), "Bullish OB Color", group=group_ob)
+bearishOBColor = input.color(color.new(color.red, 85), "Bearish OB Color", group=group_ob)
+maxOBCount = input.int(15, "Max Order Blocks", minval=1, group=group_ob)
+
+var array<box> obBoxes = array.new<box>()
+var array<bool> obMitigated = array.new<bool>()
+var array<string> obType = array.new<string>()
+
+f_isBullishOB(idx) =>
+    close[idx] > open[idx] and close[idx - 1] < open[idx - 1]
+
+f_isBearishOB(idx) =>
+    close[idx] < open[idx] and close[idx - 1] > open[idx - 1]
+
+if showOB
+    atrVal = ta.atr(atrPeriod)
+    displacement = atrVal * obDisplacement
+    
+    if f_isBullishOB(1)
+        obBox = box.new(bar_index[1], high[1], bar_index, low[1], border_color=bullishOBColor, bgcolor=bullishOBColor)
+        array.push(obBoxes, obBox)
+        array.push(obMitigated, false)
+        array.push(obType, "bullish")
+        if array.size(obBoxes) > maxOBCount
+            oldBox = array.shift(obBoxes)
+            box.set_deleted(oldBox, true)
+            array.shift(obMitigated)
+            array.shift(obType)
+    
+    if f_isBearishOB(1)
+        obBox = box.new(bar_index[1], high[1], bar_index, low[1], border_color=bearishOBColor, bgcolor=bearishOBColor)
+        array.push(obBoxes, obBox)
+        array.push(obMitigated, false)
+        array.push(obType, "bearish")
+        if array.size(obBoxes) > maxOBCount
+            oldBox = array.shift(obBoxes)
+            box.set_deleted(oldBox, true)
+            array.shift(obMitigated)
+            array.shift(obType)
+
+if showOB and array.size(obBoxes) > 0
+    for i = 0 to array.size(obBoxes) - 1
+        obBox = array.get(obBoxes, i)
+        isMit = array.get(obMitigated, i)
+        obT = array.get(obType, i)
+        
+        if not isMit
+            boxTop = box.get_top(obBox)
+            boxBot = box.get_bottom(obBox)
+            
+            if obT == "bullish"
+                if obMitigation == "close"
+                    if close > boxTop
+                        array.set(obMitigated, i, true)
+                        box.set_border_color(obBox, color.gray)
+                        box.set_bgcolor(obBox, color.new(color.gray, 85))
+                else
+                    if high > boxTop
+                        array.set(obMitigated, i, true)
+                        box.set_border_color(obBox, color.gray)
+                        box.set_bgcolor(obBox, color.new(color.gray, 85))
+            else
+                if obMitigation == "close"
+                    if close < boxBot
+                        array.set(obMitigated, i, true)
+                        box.set_border_color(obBox, color.gray)
+                        box.set_bgcolor(obBox, color.new(color.gray, 85))
+                else
+                    if low < boxBot
+                        array.set(obMitigated, i, true)
+                        box.set_border_color(obBox, color.gray)
+                        box.set_bgcolor(obBox, color.new(color.gray, 85))
+            
+            box.set_right(obBox, bar_index)
+
+// ============================================
+// ALERTS
+// ============================================
+
+group_alerts = "ALERTS"
+
+alertFVG = input.bool(true, "Alert on FVG", group=group_alerts)
+alertIFVG = input.bool(true, "Alert on IFVG", group=group_alerts)
+alertOB = input.bool(true, "Alert on OB", group=group_alerts)
+
+if alertFVG and array.size(fvgBoxes) > 0
+    lastFVG = not array.get(isIFVG, array.size(isIFVG) - 1)
+    if lastFVG
+        alert("New FVG Detected!", alert.freq_once_per_bar)
+
+if alertIFVG and array.size(fvgBoxes) > 0
+    lastIFVG = array.get(isIFVG, array.size(isIFVG) - 1)
+    if lastIFVG
+        alert("IFVG Converted!", alert.freq_once_per_bar)
+
+if alertOB and array.size(obBoxes) > 0
+    lastOB = not array.get(obMitigated, array.size(obMitigated) - 1)
+    if lastOB
+        alert("New Order Block!", alert.freq_once_per_bar)
