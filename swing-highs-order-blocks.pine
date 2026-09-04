@@ -29,14 +29,13 @@ showOTE = input.bool(true, "Show OTE", group="OTE")
 // SWING HIGH DETECTION
 // ============================================
 
-isSwingHigh = false
-if ta.highest(high, swingLength) == high[swingLength/2]
-    isSwingHigh := true
+midPoint = math.round(swingLength / 2)
+isSwingHigh = ta.highest(high, swingLength) == high[midPoint]
 
 // Draw Swing Highs
 if isSwingHigh
-    size = swingHighSize == "large" ? size.large : (swingHighSize == "medium" ? size.medium : size.small)
-    plotshape(isSwingHigh, location=location.abovebar, shape=shape.diamond, color=swingHighColor, size=size, title="Swing High")
+    size_val = swingHighSize == "large" ? size.large : (swingHighSize == "medium" ? size.medium : size.small)
+    plotshape(isSwingHigh, location=location.abovebar, shape=shape.diamond, color=swingHighColor, size=size_val, title="Swing High")
 
 // ============================================
 // ORDER BLOCK DETECTION
@@ -85,13 +84,13 @@ if showIFVG
 if showOTE
     // OTE: When price retests a swing low/high with confluence
     swingLow = ta.lowest(low, oteLength)
-    swingHigh = ta.highest(high, oteLength)
+    swingHigh_val = ta.highest(high, oteLength)
     
     // Bullish OTE: Price near swing low with higher high
     bullishOTE = low <= swingLow * 1.001 and high > high[1]
     
     // Bearish OTE: Price near swing high with lower low
-    bearishOTE = high >= swingHigh * 0.999 and low < low[1]
+    bearishOTE = high >= swingHigh_val * 0.999 and low < low[1]
     
     if bullishOTE
         plotshape(bullishOTE, location=location.belowbar, shape=shape.triangle, color=oteColor, size=size.small, title="Bullish OTE")
@@ -104,9 +103,6 @@ if showOTE
 // ============================================
 
 alertSwingHigh = ta.change(isSwingHigh) and isSwingHigh
-alertOrderBlock = false
-alertIFVG = false
-alertOTE = false
 
 if alertSwingHigh
     alert("Swing High Detected!", alert.freq_once_per_bar_close)
