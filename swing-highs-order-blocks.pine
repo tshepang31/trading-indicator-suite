@@ -29,17 +29,6 @@ sessionTimeZone = input.string("UTC", "Timezone", options=["UTC", "GMT+1", "GMT+
 // SESSION TRACKING VARIABLES
 // ============================================
 
-var array<line> asiaHighLines = array.new<line>()
-var array<line> asiaLowLines = array.new<line>()
-var array<line> londonHighLines = array.new<line>()
-var array<line> londonLowLines = array.new<line>()
-var array<line> nyHighLines = array.new<line>()
-var array<line> nyLowLines = array.new<line>()
-
-var array<label> asiaLabels = array.new<label>()
-var array<label> londonLabels = array.new<label>()
-var array<label> nyLabels = array.new<label>()
-
 var float asiaSessionHigh = na
 var float asiaSessionLow = na
 var float londonSessionHigh = na
@@ -55,21 +44,25 @@ var string lastNySession = ""
 // HELPER FUNCTIONS
 // ============================================
 
+f_parseTimeString(timeStr) =>
+    parts = str.split(timeStr, ":")
+    hourStr = array.get(parts, 0)
+    minStr = array.get(parts, 1)
+    hour = str.tonumber(hourStr)
+    minute = str.tonumber(minStr)
+    [hour, minute]
+
 f_timeInRange(sessionStart, sessionEnd) =>
+    [startHour, startMin] = f_parseTimeString(sessionStart)
+    [endHour, endMin] = f_parseTimeString(sessionEnd)
+    
     currentTime = time(timeframe.period, sessionTimeZone)
     currentHour = hour(currentTime)
     currentMin = minute(currentTime)
-    currentMinutes = currentHour * 60 + currentMin
     
-    startParts = str.split(sessionStart, ":")
-    startHour = int(array.get(startParts, 0))
-    startMin = int(array.get(startParts, 1))
     startMinutes = startHour * 60 + startMin
-    
-    endParts = str.split(sessionEnd, ":")
-    endHour = int(array.get(endParts, 0))
-    endMin = int(array.get(endParts, 1))
     endMinutes = endHour * 60 + endMin
+    currentMinutes = currentHour * 60 + currentMin
     
     if startMinutes <= endMinutes
         currentMinutes >= startMinutes and currentMinutes < endMinutes
